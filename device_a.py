@@ -24,6 +24,8 @@ class App:
         # Initialize peer discovery
         self.peer_discovery = set()  # Use this set to store discovered peers
 
+        print(f"App initialized for {self.nik} on port {self.conf.port}")
+
     async def run(self):
         # Create the chat room before running tasks
         self.make_chat(self.conf.start_ping)
@@ -33,6 +35,7 @@ class App:
             self.listener(),
             self.cli(),
         ]
+        print("Starting tasks...")
         await asyncio.gather(*tasks)
 
     def make_chat(self, theme):
@@ -40,6 +43,7 @@ class App:
         self.rooms[room.theme] = room
         # Create tasks using asyncio.create_task within async context
         asyncio.create_task(self.spamer(room))
+        print(f"Chat room '{theme}' created.")
 
     async def cli(self):
         while True:
@@ -48,14 +52,17 @@ class App:
             if room:
                 message = self.new_message(room.theme, line)
                 await room.postoffice.put(message)
+                print(f"Message sent to room '{room.theme}': {line}")
 
     async def listener(self):
         addr = ('0.0.0.0', self.conf.port)
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind(addr)
+        print(f"Listening for incoming messages on port {self.conf.port}")
 
         while True:
             data, addr = await asyncio.to_thread(sock.recvfrom, 4096)
+            print(f"Received data from {addr}")
             await self.receive_msg(data, addr)
 
     async def receive_msg(self, buf, addr):
@@ -63,6 +70,7 @@ class App:
         room = self.rooms.get(msg['theme'])
         if room:
             await room.mailbox.put(msg)
+            print(f"Message received in room '{msg['theme']}' from {addr}")
         else:
             print(f"Received message for unknown chat: {msg['theme']}")
 
@@ -71,6 +79,7 @@ class App:
         while not self.stop_grabber:
             for peer in self.peer_discovery:
                 # Placeholder for real peer discovery
+                print(f"Grabbing peers for {peer}")
                 pass
             await asyncio.sleep(10)
 
@@ -111,11 +120,13 @@ class App:
                     if time.time() - msg['time'] > 86400:
                         continue
                     await self.send_msg(msg, peer)
+                    print(f"Spam message sent to peer {peer}: {msg['text']}")
 
     async def send_msg(self, msg, peer):
         addr = (peer, self.conf.dst_port)
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.sendto(self.pack_message(msg), addr)
+        print(f"Message sent to {addr}: {msg['text']}")
 
 class ChatRoom:
     def __init__(self, theme):
