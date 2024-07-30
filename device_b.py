@@ -24,6 +24,9 @@ class App:
 
         self.dht = lt.session()
         self.dht.listen_on(self.conf.dht_port, self.conf.dht_port + 10)
+        self.dht.add_dht_router("router.bittorrent.com", 6881)
+        self.dht.add_dht_router("dht.transmissionbt.com", 6881)
+        self.dht.add_dht_router("router.utorrent.com", 6881)
         self.stop_grabber = False
 
         self.loop = asyncio.get_event_loop()
@@ -125,7 +128,7 @@ class ChatRoom:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--port', type=int, default=3301)  # Port for device B
+    parser.add_argument('--port', type=int, default=3301)
     parser.add_argument('--dstport', type=int, default=3300)  # Port for device A
     parser.add_argument('--dhtport', type=int, default=6882)
     parser.add_argument('--nodes', type=str, default='')
