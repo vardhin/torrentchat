@@ -6,8 +6,6 @@ import socket
 import struct
 import time
 
-import libtorrent as lt
-
 class Config:
     def __init__(self, port, dst_port, dht_port, start_ping):
         self.port = port
@@ -21,30 +19,31 @@ class App:
         self.conf = conf
         self.rooms = {}
         self.msgid = 0
-
-        self.dht = lt.session()
-        self.dht.listen_on(self.conf.dht_port, self.conf.dht_port + 10)
-        self.dht.add_dht_router("router.bittorrent.com", 6881)
-        self.dht.add_dht_router("dht.transmissionbt.com", 6881)
-        self.dht.add_dht_router("router.utorrent.com", 6881)
         self.stop_grabber = False
 
-        self.loop = asyncio.get_event_loop()
+        # Initialize peer discovery
+        self.peer_discovery = set()  # Use this set to store discovered peers
 
     async def run(self):
-        self.loop.create_task(self.grab_peers())
-        self.loop.create_task(self.listener())
-        self.loop.create_task(self.cli())
-        await asyncio.sleep(10000)  # Run for a long time
+        # Create the chat room before running tasks
+        self.make_chat(self.conf.start_ping)
+        
+        # Create and run tasks
+        tasks = [
+            self.listener(),
+            self.cli(),
+        ]
+        await asyncio.gather(*tasks)
 
     def make_chat(self, theme):
         room = ChatRoom(theme)
         self.rooms[room.theme] = room
-        self.loop.create_task(self.spamer(room))
+        # Create tasks using asyncio.create_task within async context
+        asyncio.create_task(self.spamer(room))
 
     async def cli(self):
         while True:
-            line = await self.loop.run_in_executor(None, input, "$ ")
+            line = await asyncio.to_thread(input, "$ ")
             room = self.rooms.get(self.conf.start_ping)
             if room:
                 message = self.new_message(room.theme, line)
@@ -56,7 +55,7 @@ class App:
         sock.bind(addr)
 
         while True:
-            data, addr = await self.loop.run_in_executor(None, sock.recvfrom, 4096)
+            data, addr = await asyncio.to_thread(sock.recvfrom, 4096)
             await self.receive_msg(data, addr)
 
     async def receive_msg(self, buf, addr):
@@ -68,10 +67,11 @@ class App:
             print(f"Received message for unknown chat: {msg['theme']}")
 
     async def grab_peers(self):
+        # Simple example: broadcast to a known set of peers
         while not self.stop_grabber:
-            for room in self.rooms.values():
-                ihash = lt.sha1_hash(room.theme.encode())
-                self.dht.dht_get_peers(ihash)
+            for peer in self.peer_discovery:
+                # Placeholder for real peer discovery
+                pass
             await asyncio.sleep(10)
 
     def new_message(self, theme, text):
@@ -139,6 +139,6 @@ if __name__ == '__main__':
 
     conf = Config(args.port, args.dstport, args.dhtport, args.nodes)
     app = App(args.nik, conf)
-    app.make_chat(args.room)
 
+    # Run the application using asyncio.run()
     asyncio.run(app.run())
